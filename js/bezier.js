@@ -7,6 +7,7 @@
 	point={p1:{x:150,y:250},p2:{x:450,y:250},cp1:{x:300,y:100}},
 	history=[],
 	temp=[],
+	isLink=false, // 是否绘制连续的图像
 	cp2={x:400,y:100},
 	round={
 		curve:{width:2,color:"#1572b5"},
@@ -37,6 +38,7 @@
 	function drawCanvas(){
 		ctx.clearRect(0,0,canvas.width,canvas.height);
 		drawUploadImg()
+		drawMatrix(ctx);
 		ctx.beginPath();
 		ctx.lineWidth=round.cpline.width;
 		ctx.strokeStyle=round.cpline.color;
@@ -53,14 +55,13 @@
 		ctx.lineWidth=round.curve.width;
 		ctx.strokeStyle=round.curve.color;
 		ctx.beginPath();
-		drawHistory(ctx)
-		ctx.moveTo(point.p1.x,point.p1.y);
+		drawHistory(ctx);
 		if(isQuadratic){
 			ctx.bezierCurveTo(point.cp1.x,point.cp1.y,point.cp2.x,point.cp2.y,point.p2.x,point.p2.y)
-			temp = [point.p1.x,point.p1.y,point.cp1.x,point.cp1.y,point.cp2.x,point.cp2.y,point.p2.x,point.p2.y]
+			temp = [point.p1.x,point.p1.y, point.cp1.x,point.cp1.y,point.cp2.x,point.cp2.y,point.p2.x,point.p2.y]
 		}else{
 			ctx.quadraticCurveTo(point.cp1.x,point.cp1.y,point.p2.x,point.p2.y)
-			temp = [point.p1.x,point.p1.y,point.cp1.x,point.cp1.y,point.p2.x,point.p2.y]
+			temp = [point.p1.x,point.p1.y, point.cp1.x,point.cp1.y,point.p2.x,point.p2.y]
 		}
 		ctx.stroke();
 		for(var v in point){
@@ -82,12 +83,12 @@
 		}else{
 			codeHTML+="ctx.quadraticCurveTo("+point.cp1.x+", "+point.cp1.y+", "+point.p2.x+", "+point.p2.y+");\n"
 		}
+
 		code.innerHTML='canvas = document.getElementById("canvas");\n';
 		code.innerHTML+='ctx = canvas.getContext("2d")\n';
 		code.innerHTML+='ctx.strokeStyle = "'+round.curve.color+'";\n';
 		code.innerHTML+='ctx.lineWidth = '+round.curve.width+';\n';
 		code.innerHTML+='ctx.beginPath();\n';
-		code.innerHTML+='ctx.moveTo('+point.p1.x+", "+point.p1.y+");\n";
 		code.innerHTML+=codeHTML;
 		code.innerHTML+="ctx.stroke();\n";
 		code.innerHTML+="ctx.closePath();\n";
@@ -132,31 +133,77 @@
 		}
 	}
 
+	function drawMatrix (ctx) {
+		for (var i = 0; i < 25; i++) {
+			for (var j = 0; j < 25; j++) {
+				ctx.save();
+				ctx.beginPath();
+				ctx.lineWidth = 0.2;
+				ctx.strokeStyle = '#ccc';
+				ctx.translate(j * 25, i * 25);
+				ctx.strokeRect(0, 0, 25, 25);
+				ctx.restore();
+			}
+		}
+	}
+
 	function drawHistory(ctx){
+		if (isLink && history.length) {
+			const lastIndex = history.length - 1;
+			const lastItem = history[lastIndex].slice(-2);
+			if (point.p1.x !== lastItem[0] || point.p1.y !== lastItem[1]) {
+				const itemLen = history[lastIndex].length
+				console.log('isLink', itemLen)
+				
+				history[lastIndex][itemLen - 2] = point.p1.x;
+				history[lastIndex][itemLen - 1] = point.p1.y;
+			}
+		}
+
+		let lastP2 = null
 		for (let item of history) {
-			ctx.moveTo(...item.slice(0, 2))
+			// 将上一次的结束坐标与这一次的开始坐标进行对比，如果相同，则不需要写moveTo
+			if (!lastP2 || lastP2[0] !== item[0] || lastP2[1] !== item[1]) {
+				ctx.moveTo(item[0],item[1]);
+			}
+			lastP2 = item.slice(-2);
+
 			if (item.length === 8) {
 				ctx.bezierCurveTo(...item.slice(2))
 			} else {
 				ctx.quadraticCurveTo(...item.slice(2))
 			}
 		}
+		ctx.moveTo(point.p1.x,point.p1.y)
 	}
 
-	function saveSnapshut() {
-		history.push(temp)
-		console.log(history)
+	function saveSnapshot() {
+		history.push(temp);
+		[point.p1, point.p2] = [point.p2, point.p1];
+		if (point.cp2) {
+			console.log(point.cp2);
+			[point.cp1, point.cp2] = [point.cp2, point.cp1];
+		}
+		// console.log(history)
 	}
 
 	function appendHistoryText() {
 		let html = ''
+		let lastP2 = null
 		for (let item of history) {
+			// 将上一次的结束坐标与这一次的开始坐标进行对比，如果相同，则不需要写moveTo
+			if (!lastP2 || lastP2[0] !== item[0] || lastP2[1] !== item[1]) {
+				html += `ctx.moveTo(${item[0]}, ${item[1]});\n`
+			}
+			lastP2 = item.slice(-2);
+
 			if (item.length === 8) {
 				html += `ctx.bezierCurveTo(${item.slice(2).join(', ')});\n`
 			} else {
 				html += `ctx.quadraticCurveTo(${item.slice(2).join(', ')});\n`
 			}
 		}
+		html += `ctx.moveTo(${point.p1.x}, ${point.p1.y});\n`
 		return html
 	}
 	
@@ -189,6 +236,10 @@
 		drawCanvas()
 	}
 	document.getElementById('next').onclick=function(){
-		saveSnapshut()
+		saveSnapshot()
+	}
+	document.getElementById('link').onchange=function(){
+		console.log(this.checked)
+		isLink = this.checked;
 	}
 })();
