@@ -1,9 +1,12 @@
 (function(){
+	// 准备画布
 	var clickPoint=null,sourcePoint,isQuadratic = false,
 	canvas=document.getElementById("canvas"),
 	code=document.getElementById("code"),
 	ctx=canvas.getContext("2d"),
 	point={p1:{x:150,y:250},p2:{x:450,y:250},cp1:{x:300,y:100}},
+	history=[],
+	temp=[],
 	cp2={x:400,y:100},
 	round={
 		curve:{width:2,color:"#1572b5"},
@@ -50,11 +53,14 @@
 		ctx.lineWidth=round.curve.width;
 		ctx.strokeStyle=round.curve.color;
 		ctx.beginPath();
+		drawHistory(ctx)
 		ctx.moveTo(point.p1.x,point.p1.y);
 		if(isQuadratic){
 			ctx.bezierCurveTo(point.cp1.x,point.cp1.y,point.cp2.x,point.cp2.y,point.p2.x,point.p2.y)
+			temp = [point.p1.x,point.p1.y,point.cp1.x,point.cp1.y,point.cp2.x,point.cp2.y,point.p2.x,point.p2.y]
 		}else{
 			ctx.quadraticCurveTo(point.cp1.x,point.cp1.y,point.p2.x,point.p2.y)
+			temp = [point.p1.x,point.p1.y,point.cp1.x,point.cp1.y,point.p2.x,point.p2.y]
 		}
 		ctx.stroke();
 		for(var v in point){
@@ -70,11 +76,11 @@
 	}
 	//插入对应文字到提示框
 	function appendText(){
-		var codeHTML="";
+		var codeHTML=appendHistoryText();
 		if(point.cp2){
-			codeHTML="ctx.bezierCurveTo("+point.cp1.x+", "+point.cp1.y+", "+point.cp2.x+", "+point.cp2.y+", "+point.p2.x+", "+point.p2.y+");\n"
+			codeHTML+="ctx.bezierCurveTo("+point.cp1.x+", "+point.cp1.y+", "+point.cp2.x+", "+point.cp2.y+", "+point.p2.x+", "+point.p2.y+");\n"
 		}else{
-			codeHTML="ctx.quadraticCurveTo("+point.cp1.x+", "+point.cp1.y+", "+point.p2.x+", "+point.p2.y+");\n"
+			codeHTML+="ctx.quadraticCurveTo("+point.cp1.x+", "+point.cp1.y+", "+point.p2.x+", "+point.p2.y+");\n"
 		}
 		code.innerHTML='canvas = document.getElementById("canvas");\n';
 		code.innerHTML+='ctx = canvas.getContext("2d")\n';
@@ -125,6 +131,34 @@
 			ctx.drawImage(img, 0, 0)
 		}
 	}
+
+	function drawHistory(ctx){
+		for (let item of history) {
+			ctx.moveTo(...item.slice(0, 2))
+			if (item.length === 8) {
+				ctx.bezierCurveTo(...item.slice(2))
+			} else {
+				ctx.quadraticCurveTo(...item.slice(2))
+			}
+		}
+	}
+
+	function saveSnapshut() {
+		history.push(temp)
+		console.log(history)
+	}
+
+	function appendHistoryText() {
+		let html = ''
+		for (let item of history) {
+			if (item.length === 8) {
+				html += `ctx.bezierCurveTo(${item.slice(2).join(', ')});\n`
+			} else {
+				html += `ctx.quadraticCurveTo(${item.slice(2).join(', ')});\n`
+			}
+		}
+		return html
+	}
 	
 	document.getElementById("bezierCurveTo").onclick=function(){
 		if(isQuadratic){
@@ -153,5 +187,8 @@
 	document.getElementById('lineWidth').onchange=function(){
 		round.curve.width=this.value
 		drawCanvas()
+	}
+	document.getElementById('next').onclick=function(){
+		saveSnapshut()
 	}
 })();
